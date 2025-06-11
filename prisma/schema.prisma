@@ -1,0 +1,662 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MessageStatus {
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum ContactMessageType {
+  TESTIMONIAL
+  COMPLAINT
+  SUPPORT
+  FEEDBACK
+  GENERAL_INQUIRY
+}
+
+enum SocialLinkType {
+  X
+  GITHUB
+  LINKEDIN
+  INSTAGRAM
+  FACEBOOK
+  TIKTOK
+  YOUTUBE
+  DISCORD
+  TELEGRAM
+  WHATSAPP
+  WEBSITE
+  EMAIL
+}
+
+enum Tier {
+  NONE
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+  DIAMOND
+}
+
+enum SystemContentType {
+  WELCOME
+}
+
+enum OrderStatus {
+  WAITING_FOR_PAYMENT
+  PENDING
+  IN_PROGRESS
+  DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+enum NotificationType {
+  ORDER_UPDATE
+  MESSAGE
+  PAYMENT
+  SYSTEM
+  REVIEW
+  REVISION_REQUESTED
+  DELIVERY_UPLOADED
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  OTHER
+}
+
+enum MessageType {
+  TEXT
+  MEDIA
+  SYSTEM
+}
+
+enum FeedbackCategory {
+  GENERAL
+  FEATURE_REQUEST
+  BUG_REPORT
+  UI_UX
+}
+
+enum ComplaintStatus {
+  PENDING
+  IN_REVIEW
+  RESOLVED
+  CLOSED
+}
+
+enum SupportPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum SupportStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model ContactMessage {
+  id String @id @default(uuid())
+
+  type ContactMessageType
+
+  author   User?   @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  authorId String?
+
+  guestEmail String?
+
+  testimonialContent TestimonialContent?
+  complaintContent   ComplaintContent?
+  supportContent     SupportContent?
+  feedbackContent    FeedbackContent?
+  generalContent     GeneralContent?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([type, createdAt])
+  @@index([authorId, createdAt])
+}
+
+model TestimonialContent {
+  id String @id @default(uuid())
+
+  content String
+  rating  Int
+
+  contactMessage   ContactMessage @relation(fields: [contactMessageId], references: [id], onDelete: Cascade)
+  contactMessageId String         @unique
+}
+
+model ComplaintContent {
+  id String @id @default(uuid())
+
+  orderId     String
+  description String
+
+  contactMessage   ContactMessage @relation(fields: [contactMessageId], references: [id], onDelete: Cascade)
+  contactMessageId String         @unique
+
+  status ComplaintStatus @default(PENDING)
+}
+
+model SupportContent {
+  id String @id @default(uuid())
+
+  subject     String
+  description String
+
+  contactMessage   ContactMessage @relation(fields: [contactMessageId], references: [id], onDelete: Cascade)
+  contactMessageId String         @unique
+
+  priority SupportPriority @default(NORMAL)
+  status   SupportStatus   @default(OPEN)
+}
+
+model FeedbackContent {
+  id String @id @default(uuid())
+
+  message  String
+  category FeedbackCategory @default(GENERAL)
+
+  contactMessage   ContactMessage @relation(fields: [contactMessageId], references: [id], onDelete: Cascade)
+  contactMessageId String         @unique
+}
+
+model GeneralContent {
+  id String @id @default(uuid())
+
+  subject String?
+  message String  @db.Text
+
+  contactMessage   ContactMessage @relation(fields: [contactMessageId], references: [id], onDelete: Cascade)
+  contactMessageId String         @unique
+}
+
+model PortfolioItem {
+  id String @id @default(uuid())
+
+  title       String
+  description String?
+  url         String?
+
+  images Image[]
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  userId String
+
+  createdAt DateTime @default(now())
+}
+
+model SocialLink {
+  id String @id @default(uuid())
+
+  type SocialLinkType
+  url  String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  userId String
+}
+
+model User {
+  id String @id @default(uuid())
+
+  username          String  @unique
+  email             String  @unique
+  password          String
+  isVerified        Boolean @default(false)
+  avatar            String?
+  banner            String?
+  headline          String?
+  bio               String?
+  firstName         String
+  lastName          String
+  isKycVerified     Boolean @default(false)
+  isProfileVerified Boolean @default(false)
+
+  verificationToken VerificationToken?
+  gigs              Gig[]               @relation("Seller")
+  bookmarked        Gig[]               @relation("Bookmarked")
+  reviews           Review[]
+  skills            UserSkill[]
+  buyerChats        Chat[]              @relation("BuyerChat")
+  sellerChats       Chat[]              @relation("SellerChat")
+  badgeProgress     UserBadgeProgress[]
+  ordersAsBuyer     Order[]             @relation("Buyer")
+  ordersAsSeller    Order[]             @relation("Seller")
+  notifications     Notification[]
+  socialLinks       SocialLink[]
+  portfolioItems    PortfolioItem[]
+  messages          UserMessage[]
+  readMessages      Message[]           @relation("MessageReadBy")
+  contactMessages   ContactMessage[]
+  wallets           Wallet[]
+  preferences       UserPreferences?
+  country           String
+  languages         String[]
+
+  createdAt DateTime @default(now())
+}
+
+model UserMessage {
+  id String @id @default(uuid())
+
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  textContent  TextContent?
+  mediaContent MediaContent?
+
+  userId String?
+}
+
+model MediaFile {
+  id String @id @default(uuid())
+
+  url  String
+  type MediaType
+
+  images       Image[]
+  mediaContent MediaContent[]
+}
+
+model Order {
+  id String @id @default(uuid())
+
+  deadline DateTime
+  status   OrderStatus @default(WAITING_FOR_PAYMENT)
+
+  package     Package      @relation(fields: [packageId], references: [id], onDelete: Restrict)
+  review      Review?
+  chat        Chat?
+  buyer       User         @relation(name: "Buyer", fields: [buyerId], references: [id], onDelete: Restrict)
+  seller      User         @relation(name: "Seller", fields: [sellerId], references: [id], onDelete: Restrict)
+  gig         Gig?         @relation(fields: [gigId], references: [id], onDelete: SetNull)
+  transaction Transaction?
+
+  packageId String
+  buyerId   String
+  sellerId  String
+  gigId     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([buyerId, status])
+  @@index([sellerId, status])
+  @@index([status, deadline])
+}
+
+model Notification {
+  id String @id @default(uuid())
+
+  type        NotificationType
+  title       String
+  description String
+  isRead      Boolean          @default(false)
+
+  recipient User @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+
+  recipientId String
+
+  createdAt DateTime @default(now())
+}
+
+model VerificationToken {
+  id String @id @default(uuid())
+
+  code      String   @unique
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  userId String @unique
+
+  createdAt DateTime @default(now())
+}
+
+model Gig {
+  id String @id @default(uuid())
+
+  title       String
+  description String
+
+  images    Image[]
+  packages  Package[]
+  seller    User         @relation(name: "Seller", fields: [sellerId], references: [id], onDelete: Cascade)
+  bookmarks User[]       @relation("Bookmarked")
+  category  Category     @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  tags      Tag[]
+  features  GigFeature[]
+  reviews   Review[]
+  faqs      GigFaq[]
+  orders    Order[]
+
+  categoryId String
+  sellerId   String
+
+  createdAt DateTime @default(now())
+}
+
+model Image {
+  id String @id @default(uuid())
+
+  isPrimary Boolean @default(false)
+
+  file          MediaFile      @relation(fields: [fileId], references: [id], onDelete: Restrict)
+  gig           Gig?           @relation(fields: [gigId], references: [id], onDelete: SetNull)
+  portfolioItem PortfolioItem? @relation(fields: [portfolioItemId], references: [id], onDelete: SetNull)
+
+  fileId          String
+  gigId           String?
+  portfolioItemId String?
+
+  createdAt DateTime @default(now())
+}
+
+model Package {
+  id String @id @default(uuid())
+
+  title        String
+  price        Float
+  revisions    Int
+  deliveryTime Int
+
+  gig      Gig              @relation(fields: [gigId], references: [id], onDelete: Cascade)
+  features PackageFeature[]
+  orders   Order[]
+
+  gigId String
+}
+
+model GigFeature {
+  id String @id @default(uuid())
+
+  title String
+
+  gig             Gig              @relation(fields: [gigId], references: [id], onDelete: Cascade)
+  packageFeatures PackageFeature[]
+
+  gigId String
+
+  createdAt DateTime @default(now())
+}
+
+model PackageFeature {
+  id String @id @default(uuid())
+
+  isIncluded Boolean
+
+  gigPackage Package    @relation(fields: [gigPackageId], references: [id], onDelete: Cascade)
+  feature    GigFeature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  gigPackageId String
+  featureId    String
+}
+
+model Tag {
+  id String @id @default(uuid())
+
+  title String @unique
+
+  gigs Gig[]
+}
+
+model Category {
+  id String @id @default(uuid())
+
+  title String @unique
+  depth Int    @default(0)
+  icon  String
+  color String
+
+  gigs     Gig[]
+  children Category[] @relation("CategoryParent")
+  parent   Category?  @relation("CategoryParent", fields: [parentId], references: [id], onDelete: Restrict)
+
+  parentId String?
+}
+
+model Review {
+  id String @id @default(uuid())
+
+  rating      Int
+  title       String
+  description String
+
+  sellerResponse    String?
+  sellerRespondedAt DateTime?
+
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  order  Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  gig    Gig?  @relation(fields: [gigId], references: [id], onDelete: SetNull)
+
+  orderId  String  @unique
+  authorId String?
+  gigId    String?
+
+  createdAt DateTime @default(now())
+
+  // Add indexes for better query performance
+  @@index([gigId, createdAt])
+  @@index([sellerResponse])
+}
+
+model Skill {
+  id String @id @default(uuid())
+
+  title String
+
+  userSkills UserSkill[]
+}
+
+model UserSkill {
+  id String @id @default(uuid())
+
+  level Int @default(0)
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  userId  String
+  skillId String
+
+  @@unique([userId, skillId])
+}
+
+model Chat {
+  id String @id @default(uuid())
+
+  buyer    User      @relation(name: "BuyerChat", fields: [buyerId], references: [id], onDelete: Restrict)
+  seller   User      @relation(name: "SellerChat", fields: [sellerId], references: [id], onDelete: Restrict)
+  messages Message[]
+  order    Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  sellerId String
+  buyerId  String
+  orderId  String? @unique
+}
+
+model Message {
+  id String @id @default(uuid())
+
+  type   MessageType
+  status MessageStatus @default(SENT)
+
+  chat          Chat           @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  readBy        User[]         @relation("MessageReadBy")
+  textContent   TextContent?
+  mediaContent  MediaContent?
+  systemContent SystemContent?
+
+  chatId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([chatId, createdAt])
+}
+
+model TextContent {
+  id String @id @default(uuid())
+
+  text String
+
+  message     Message     @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userMessage UserMessage @relation(fields: [userMessageId], references: [id], onDelete: Cascade)
+
+  messageId     String @unique
+  userMessageId String @unique
+}
+
+model MediaContent {
+  id String @id @default(uuid())
+
+  files       MediaFile[]
+  message     Message     @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userMessage UserMessage @relation(fields: [userMessageId], references: [id], onDelete: Cascade)
+
+  messageId     String @unique
+  userMessageId String @unique
+}
+
+model SystemContent {
+  id String @id @default(uuid())
+
+  content String
+  type    SystemContentType
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  messageId String @unique
+}
+
+model Badge {
+  id String @id @default(uuid())
+
+  title       String
+  description String
+  condition   String
+  icon        String
+  color       String
+
+  userBadges UserBadgeProgress[]
+  milestones BadgeMilestone[]
+}
+
+model BadgeMilestone {
+  id String @id @default(uuid())
+
+  threshold Int
+  tier      Tier
+
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  badgeId String
+}
+
+model UserBadgeProgress {
+  id String @id @default(uuid())
+
+  isFeatured      Boolean @default(false)
+  highestTier     Tier    @default(NONE)
+  currentProgress Int     @default(0)
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  userId  String
+  badgeId String
+
+  @@unique([userId, badgeId])
+}
+
+model GigFaq {
+  id String @id @default(uuid())
+
+  question String
+  answer   String
+
+  gig Gig @relation(fields: [gigId], references: [id], onDelete: Cascade)
+
+  gigId String
+}
+
+model Wallet {
+  publicKey String @id
+
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId               String
+  isMain               Boolean       @default(false)
+  transactionsSender   Transaction[] @relation("Sender")
+  transactionsReceiver Transaction[] @relation("Receiver")
+
+  name String
+
+  createdAt DateTime @default(now())
+}
+
+model FAQ {
+  id        String   @id @default(uuid())
+  question  String // e.g., "How do I connect my Solana wallet?"
+  answer    String // e.g., "Go to /dashboard, click 'Connect Wallet', and follow Phantom prompts."
+  createdAt DateTime @default(now())
+}
+
+model UserPreferences {
+  id       String @id @default(uuid())
+  userId   String @unique // 1:1 with User
+  user     User   @relation(fields: [userId], references: [id])
+  timezone String @default("UTC") // e.g., "America/New_York"
+  language String @default("en_US") // e.g., "en_US", "fr_FR"
+
+  // Notification preferences
+  ordersEnabled   Boolean @default(true)
+  ordersEmail     Boolean @default(true)
+  ordersInApp     Boolean @default(true)
+  messagesEnabled Boolean @default(true)
+  messagesEmail   Boolean @default(true)
+  messagesInApp   Boolean @default(true)
+  reviewsEnabled  Boolean @default(true)
+  reviewsEmail    Boolean @default(false)
+  reviewsInApp    Boolean @default(true)
+
+  // Quiet hours
+  quietHoursEnabled   Boolean @default(false)
+  quietHoursStartTime String? // e.g., "22:00" (HH:MM)
+  quietHoursEndTime   String? // e.g., "08:00" (HH:MM)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Transaction {
+  txId              String   @id
+  amount            Float // Amount in SOL 
+  sender            Wallet   @relation("Sender", fields: [senderPublicKey], references: [publicKey])
+  receiver          Wallet   @relation("Receiver", fields: [receiverPublicKey], references: [publicKey])
+  order             Order?   @relation(fields: [orderId], references: [id])
+  createdAt         DateTime @default(now())
+  senderPublicKey   String
+  receiverPublicKey String
+  orderId           String?  @unique
+
+  @@index([txId])
+  @@index([orderId])
+}
